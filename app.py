@@ -1,14 +1,31 @@
+import numpy as np
+import pandas as pd
+import datetime as dt
+
+import sqlalchemy
+from sqlalchemy.ext.automap import automap_base
+from sqlalchemy.orm import Session
+from sqlalchemy import create_engine, func, inspect
+
 from flask import Flask, jsonify
 
-justice_league_members = [
-    {"superhero": "Aquaman", "real_name": "Arthur Curry"},
-    {"superhero": "Batman", "real_name": "Bruce Wayne"},
-    {"superhero": "Cyborg", "real_name": "Victor Stone"},
-    {"superhero": "Flash", "real_name": "Barry Allen"},
-    {"superhero": "Green Lantern", "real_name": "Hal Jordan"},
-    {"superhero": "Superman", "real_name": "Clark Kent/Kal-El"},
-    {"superhero": "Wonder Woman", "real_name": "Princess Diana"}
-]
+#################################################
+# Database Setup
+#################################################
+# create engine to hawaii.sqlite
+engine = create_engine("sqlite:///Resources/hawaii.sqlite")
+
+# reflect an existing database into a new model
+Base = automap_base()
+
+# reflect the tables
+Base.prepare(engine, reflect=True)
+
+# Save references to each table
+measurement = Base.classes.measurement
+station = Base.classes.station
+
+
 
 #################################################
 # Flask Setup
@@ -20,42 +37,89 @@ app = Flask(__name__)
 # Flask Routes
 #################################################
 
-@app.route("/api/v1.0/justice-league")
-def justice_league():
-    """Return the justice league data as json"""
-
-    return jsonify(justice_league_members)
+twelve_months_ago = '2016-08-23'
 
 
 @app.route("/")
 def welcome():
     return (
-        f"Welcome to the Justice League API!<br/>"
+        f"Welcome to the Climate App API!<br/>"
         f"Available Routes:<br/>"
-        f"/api/v1.0/justice-league<br/>"
-        f"/api/v1.0/justice-league/Arthur%20Curry<br/>"
-        f"/api/v1.0/justice-league/Bruce%20Wayne<br/>"
-        f"/api/v1.0/justice-league/Victor%20Stone<br/>"
-        f"/api/v1.0/justice-league/Barry%20Allen<br/>"
-        f"/api/v1.0/justice-league/Hal%20Jordan<br/>"
-        f"/api/v1.0/justice-league/Clark%20Kent/Kal-El<br/>"
-        f"/api/v1.0/justice-league/Princess%20Diana"
+        f"/api/v1.0/precipitation<br/>"
+        f"/api/v1.0/stations<br/>"
+        f"/api/v1.0/tobs<br/>"
+        f"/api/v1.0/start<br/>"
+        f"/api/v1.0/start/end<br/>"
+        
     )
 
 
-@app.route("/api/v1.0/justice-league/<real_name>")
-def justice_league_character(real_name):
-    """Fetch the Justice League character whose real_name matches
-       the path variable supplied by the user, or a 404 if not."""
+@app.route("/api/v1.0/precipitation")
+def precipitation():
+    
 
-    canonicalized = real_name.replace(" ", "").lower()
-    for character in justice_league_members:
-        search_term = character["real_name"].replace(" ", "").lower()
+    session = Session(engine)
 
-        if search_term == canonicalized:
-            return jsonify(character)
+    precipitation_results = session.query(measurement.date, measurement.prcp).group_by(measurement.date).all()
+    
+    session.close()
 
-    return jsonify({"error": f"Character with real_name {real_name} not found."}), 404
+
+    all_results = []
+    
+    for date, prcp in precipitation_results:
+        measurement_dict = {}
+        measurement_dict["date"] = date
+        measurement_dict["prcp"] = prcp
+        all_results.append(measurement_dict)
+
+
+    return jsonify(all_results)
+
+
+
+@app.route("/api/v1.0/stations")
+def stations():
+    
+    
+    session = Session(engine)
+
+    results = session.query(station.station).all()
+
+    session.close()
+
+ 
+    all_stations = list(np.ravel(results))
+
+    return jsonify(all_stations)
+
+
+@app.route("/api/v1.0/tobs")
+def tobs():
+
+    session = Session(engine)
+
+    results = session.query(measurement.date, measurement.tobs).filter(measurement.date >= '2016-08-23').filter(measurement.station == 'USC00519281').all()
+
+    session.close()
+
+    all_results = list(np.ravel(results))
+
+    return jsonify(all_results)
+
+@app.route("/api/v1.0/<start>")
+def start(start):
+    
+    session = Session(engine)
+    
+    results = session.query(func.min(measurement.tobs), func.avg(measurement.tobs), func.max(measurement.tobs)).filter(measurement.date >= start).all()
+    
+    session.close()
+
+    all_results = list(np.ravel(results))
+    
+    return jsonify(all_results)
+
 
 
 if __name__ == "__main__":
