@@ -112,7 +112,7 @@ def start(start):
     
     session = Session(engine)
     
-    results = session.query(func.min(measurement.tobs), func.avg(measurement.tobs), func.max(measurement.tobs)).filter(measurement.date >= start).all()
+    results = session.query(func.min(measurement.tobs), func.avg(measurement.tobs), func.max(measurement.tobs)).filter(measurement.date >= start).group_by(measurement.date).all()
     
     session.close()
 
@@ -120,7 +120,20 @@ def start(start):
     
     return jsonify(all_results)
 
+    
 
+@app.route("/api/v1.0/<start>/<end>")
+def startandend(start,end):
+    
+    session = Session(engine)
+    
+    results = session.query(func.min(measurement.tobs), func.avg(measurement.tobs), func.max(measurement.tobs)).filter(measurement.date >= start).filter(measurement.date <= end).group_by(measurement.date).all()
+    
+    session.close()
+
+    all_results = list(np.ravel(results))
+    
+    return jsonify(all_results)
 
 if __name__ == "__main__":
     app.run(debug=True)
